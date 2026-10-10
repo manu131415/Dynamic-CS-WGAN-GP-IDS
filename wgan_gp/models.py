@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 
 
+
 class Generator(nn.Module):
     """Generate synthetic samples in the processed feature space."""
 
@@ -20,12 +21,16 @@ class Generator(nn.Module):
             ])
             input_dim = hidden_dim
 
-        layers.append(nn.Linear(input_dim, output_dim))
+        layers.extend([
+            nn.Linear(input_dim, output_dim),
+            nn.Tanh(),
+        ])
 
         self.network = nn.Sequential(*layers)
 
     def forward(self, noise):
         return self.network(noise)
+
 
 
 class Critic(nn.Module):

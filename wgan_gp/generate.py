@@ -10,15 +10,23 @@ from . import config
 from .models import Generator
 
 
+V2_CHECKPOINT_DIR = config.CHECKPOINT_DIR / "shellcode_v2"
+
+
 def load_generator(epoch, device):
-    """Load the Generator weights from a saved checkpoint."""
     checkpoint_path = (
-        config.CHECKPOINT_DIR / f"checkpoint_epoch_{epoch}.pt"
+        V2_CHECKPOINT_DIR / f"checkpoint_epoch_{epoch}.pt"
     )
+    processor_path = V2_CHECKPOINT_DIR / "feature_processor.joblib"
 
     if not checkpoint_path.exists():
         raise FileNotFoundError(
             f"Checkpoint not found: {checkpoint_path}"
+        )
+
+    if not processor_path.exists():
+        raise FileNotFoundError(
+            f"Feature processor not found: {processor_path}"
         )
 
     checkpoint = torch.load(
@@ -26,6 +34,8 @@ def load_generator(epoch, device):
         map_location=device,
         weights_only=True,
     )
+
+    processor = joblib.load(processor_path)
 
     generator = Generator(
         latent_dim=checkpoint["latent_dim"],
@@ -36,124 +46,28 @@ def load_generator(epoch, device):
     generator.load_state_dict(checkpoint["generator_state_dict"])
     generator.eval()
 
-    return generator, checkpoint
-
-
-def decode_samples(X_generated, preprocessor, source_df):
-    """
-    Convert generated preprocessed vectors into a raw-style
-    UNSW-NB15 DataFrame.
-
-    Numerical columns are inverse-transformed.
-    Categorical groups are decoded with argmax.
-    """
-    transformers = {
-        name: (transformer, columns)
-        for name, transformer, columns
-        in preprocessor.transformers_
-        if name != "remainder"
-    }
-
-    numerical_scaler, numerical_columns = transformers["num"]
-    categorical_encoder, categorical_columns = transformers["cat"]
-
-    numerical_columns = list(numerical_columns)
-    categorical_columns = list(categorical_columns)
-
-    n_numerical = len(numerical_columns)
-
-    # The ColumnTransformer outputs numerical features first.
-    X_numerical_scaled = X_generated[:, :n_numerical]
-    X_numerical = numerical_scaler.inverse_transform(
-        X_numerical_scaled
-    )
-
-    decoded = pd.DataFrame(
-        X_numerical,
-        columns=numerical_columns,
-    )
-
-    # Each original categorical feature has a one-hot group.
-    offset = n_numerical
-
-    for column, categories in zip(
-        categorical_columns,
-        categorical_encoder.categories_,
-    ):
-        group_width = len(categories)
-        group = X_generated[:, offset:offset + group_width]
-
-        if group.shape[1] != group_width:
-            raise ValueError(
-                f"Unexpected encoded width for category {column}."
-            )
-
-        selected_indices = np.argmax(group, axis=1)
-        decoded[column] = categories[selected_indices]
-
-        offset += group_width
-
-    if offset != X_generated.shape[1]:
+    if processor.feature_dim != checkpoint["feature_dim"]:
         raise ValueError(
-            "Generated feature dimension does not match the "
-            "preprocessor's numerical and categorical features."
+            "Processor feature dimension does not match checkpoint."
         )
 
-    # Match the original raw feature order.
-    feature_columns = [
-        column for column in source_df.columns
-        if column not in config.DROP_COLUMNS
-    ]
-    decoded = decoded[feature_columns]
-
-    # Add metadata expected by the original dataset schema.
-    if "id" in source_df.columns:
-        ids = pd.to_numeric(source_df["id"], errors="coerce")
-        next_id = int(ids.max()) + 1
-        decoded.insert(
-            0,
-            "id",
-            np.arange(next_id, next_id + len(decoded)),
-        )
-
-    decoded[config.ATTACK_CATEGORY_COLUMN] = (
-        config.TARGET_ATTACK_CATEGORY
-    )
-    decoded[config.TARGET_COLUMN] = 1
-
-    # Preserve the original CSV column order.
-    decoded = decoded[source_df.columns.tolist()]
-
-    return decoded
+    return generator, processor, checkpoint
 
 
 def generate_samples(epoch, number_of_samples, batch_size):
-    """Generate, decode, and save synthetic attack samples."""
     if number_of_samples < 1 or batch_size < 1:
-        raise ValueError(
-            "number_of_samples and batch_size must be positive."
-        )
+        raise ValueError("Sample count and batch size must be positive.")
 
-    if not config.TRAIN_PATH.exists():
-        raise FileNotFoundError(
-            f"Training CSV not found: {config.TRAIN_PATH}"
-        )
-
-    if not config.PREPROCESSOR_PATH.exists():
-        raise FileNotFoundError(
-            f"Preprocessor not found: {config.PREPROCESSOR_PATH}"
-        )
-
-    config.create_output_directories()
+    config.SYNTHETIC_DIR.mkdir(parents=True, exist_ok=True)
 
     device = torch.device(
         "cuda" if torch.cuda.is_available() else "cpu"
     )
     print(f"Using device: {device}")
 
-    generator, checkpoint = load_generator(epoch, device)
-    preprocessor = joblib.load(config.PREPROCESSOR_PATH)
-    source_df = pd.read_csv(config.TRAIN_PATH)
+    generator, processor, checkpoint = load_generator(epoch, device)
+
+    torch.manual_seed(config.RANDOM_STATE)
 
     generated_batches = []
     remaining = number_of_samples
@@ -175,63 +89,75 @@ def generate_samples(epoch, number_of_samples, batch_size):
     X_generated = np.concatenate(generated_batches, axis=0)
 
     if not np.isfinite(X_generated).all():
-        raise ValueError(
-            "Generated samples contain NaN or infinite values."
+        raise ValueError("Generated features contain non-finite values.")
+
+    # Decode into the original raw feature schema.
+    decoded = processor.inverse_transform(X_generated)
+
+    # Add the dataset metadata after decoding.
+    source_df = pd.read_csv(config.TRAIN_PATH)
+
+    if "id" in source_df.columns:
+        source_ids = pd.to_numeric(
+            source_df["id"], errors="coerce"
+        ).dropna()
+
+        next_id = int(source_ids.max()) + 1
+
+        decoded.insert(
+            0,
+            "id",
+            np.arange(next_id, next_id + len(decoded)),
         )
 
-    synthetic_df = decode_samples(
-        X_generated,
-        preprocessor,
-        source_df,
+    decoded[config.ATTACK_CATEGORY_COLUMN] = (
+        config.TARGET_ATTACK_CATEGORY
     )
+    decoded[config.TARGET_COLUMN] = 1
+
+    # Match the original dataset's column order.
+    decoded = decoded[source_df.columns.tolist()]
 
     transformed_path = (
         config.SYNTHETIC_DIR
-        / f"shellcode_transformed_epoch_{epoch}.npy"
+        / f"shellcode_v2_transformed_epoch_{epoch}.npy"
     )
     csv_path = (
         config.SYNTHETIC_DIR
-        / f"shellcode_synthetic_epoch_{epoch}.csv"
+        / f"shellcode_v2_synthetic_epoch_{epoch}.csv"
     )
 
     np.save(transformed_path, X_generated)
-    synthetic_df.to_csv(csv_path, index=False)
+    decoded.to_csv(csv_path, index=False)
 
     print("\nSynthetic generation completed.")
     print(f"Checkpoint epoch: {epoch}")
-    print(f"Generated samples: {len(synthetic_df)}")
-    print(f"Transformed feature shape: {X_generated.shape}")
-    print(f"CSV shape: {synthetic_df.shape}")
+    print(f"Generated samples: {len(decoded)}")
+    print(f"Transformed shape: {X_generated.shape}")
+    print(f"Decoded shape: {decoded.shape}")
+    print(f"Processor feature dimension: {processor.feature_dim}")
+    print(f"Constant features restored: {len(processor.constant_columns)}")
     print(f"Attack category: {config.TARGET_ATTACK_CATEGORY}")
-    print("Binary label counts:")
-    print(synthetic_df[config.TARGET_COLUMN].value_counts())
-    print(f"\nTransformed data saved to: {transformed_path}")
-    print(f"Decoded CSV saved to: {csv_path}")
-    print("\nFirst five decoded samples:")
-    print(synthetic_df.head().to_string(index=False))
+    print(f"Transformed data: {transformed_path}")
+    print(f"Decoded CSV: {csv_path}")
+    print("\nFirst five samples:")
+    print(decoded.head().to_string(index=False))
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate synthetic UNSW-NB15 attack samples."
+        description="Generate samples using the improved Shellcode WGAN-GP."
     )
-    parser.add_argument(
-        "--epoch",
-        type=int,
-        default=100,
-        help="Checkpoint epoch to use.",
-    )
+    parser.add_argument("--epoch", type=int, default=100)
     parser.add_argument(
         "--samples",
         type=int,
         default=config.NUM_SYNTHETIC_SAMPLES,
-        help="Number of synthetic samples to generate.",
     )
     parser.add_argument(
         "--batch-size",
         type=int,
         default=config.BATCH_SIZE,
-        help="Generation batch size.",
     )
 
     args = parser.parse_args()
@@ -240,9 +166,9 @@ def main():
         parser.error("epoch must be >= 1.")
 
     generate_samples(
-        epoch=args.epoch,
-        number_of_samples=args.samples,
-        batch_size=args.batch_size,
+        args.epoch,
+        args.samples,
+        args.batch_size,
     )
 
 
