@@ -1,5 +1,7 @@
 data/raw/*.csv
 
+output/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -152,6 +154,7 @@ activemq-data/
 *.sage.py
 
 # Environments
+.vscode/
 .venv/
 .env
 .envrc
