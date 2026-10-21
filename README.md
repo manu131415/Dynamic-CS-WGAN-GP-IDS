@@ -381,3 +381,11 @@ Building on the current generative foundation, this project is expanding into ga
    * Formulate the interplay between the IDS Defender (Leader) and the Generative Attacker (Follower) as a bilevel optimization game, computing equilibrium strategies where the defender minimizes evasion risk against an optimal evasion adversary.
 3. **Multi-Category Generative Expansion**:
    * Extend the target category beyond Shellcode to multi-minority attacks (`Worms`, `Backdoor`, `Analysis`).
+
+## Dataset Acknowledgements
+
+The UNSW-NB15 dataset used in this project was developed by Nour Moustafa and Jill Slay. We acknowledge the original authors and cite the following publications describing the dataset's creation, evaluation, and use:
+
+1. Moustafa, N., & Slay, J. (2015). UNSW-NB15: A comprehensive data set for network intrusion detection systems (UNSW-NB15 network data set). *Military Communications and Information Systems Conference (MilCIS)*, IEEE, 2015.
+
+2. Moustafa, N., & Slay, J. (2016). The evaluation of Network Anomaly Detection Systems: Statistical analysis of the UNSW-NB15 data set and the comparison with the KDD99 data set. *Information Security Journal: A Global Perspective*, 1–14.

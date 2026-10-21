@@ -1,0 +1,82 @@
+Configuration,Classifier,attack_cat,samples,recall
+A. Baseline IDS,Random Forest,Analysis,677,0.9970457902511078
+A. Baseline IDS,Random Forest,Backdoor,583,1.0
+A. Baseline IDS,Random Forest,DoS,4089,0.9980435314257765
+A. Baseline IDS,Random Forest,Exploits,11132,0.9933524973050665
+A. Baseline IDS,Random Forest,Fuzzers,6062,0.8289343451006268
+A. Baseline IDS,Random Forest,Generic,18871,0.9999470086375921
+A. Baseline IDS,Random Forest,Reconnaissance,3496,0.9991418764302059
+A. Baseline IDS,Random Forest,Shellcode,378,0.9761904761904762
+A. Baseline IDS,Random Forest,Worms,44,1.0
+A. Baseline IDS,Logistic Regression,Analysis,677,0.914327917282127
+A. Baseline IDS,Logistic Regression,Backdoor,583,0.9845626072041166
+A. Baseline IDS,Logistic Regression,DoS,4089,0.9603815113719736
+A. Baseline IDS,Logistic Regression,Exploits,11132,0.9195113187208049
+A. Baseline IDS,Logistic Regression,Fuzzers,6062,0.7060376113493897
+A. Baseline IDS,Logistic Regression,Generic,18871,0.9945948810343914
+A. Baseline IDS,Logistic Regression,Reconnaissance,3496,0.9699656750572082
+A. Baseline IDS,Logistic Regression,Shellcode,378,0.955026455026455
+A. Baseline IDS,Logistic Regression,Worms,44,0.9318181818181818
+A. Baseline IDS,MLP,Analysis,677,0.9985228951255539
+A. Baseline IDS,MLP,Backdoor,583,0.9965694682675815
+A. Baseline IDS,MLP,DoS,4089,0.9990217657128883
+A. Baseline IDS,MLP,Exploits,11132,0.9962270930650378
+A. Baseline IDS,MLP,Fuzzers,6062,0.8457604750907292
+A. Baseline IDS,MLP,Generic,18871,0.9998410259127762
+A. Baseline IDS,MLP,Reconnaissance,3496,0.995137299771167
+A. Baseline IDS,MLP,Shellcode,378,0.9761904761904762
+A. Baseline IDS,MLP,Worms,44,1.0
+B. Static cost-sensitive IDS,Random Forest,Analysis,677,1.0
+B. Static cost-sensitive IDS,Random Forest,Backdoor,583,1.0
+B. Static cost-sensitive IDS,Random Forest,DoS,4089,1.0
+B. Static cost-sensitive IDS,Random Forest,Exploits,11132,0.9998203377650018
+B. Static cost-sensitive IDS,Random Forest,Fuzzers,6062,0.9925767073573079
+B. Static cost-sensitive IDS,Random Forest,Generic,18871,1.0
+B. Static cost-sensitive IDS,Random Forest,Reconnaissance,3496,1.0
+B. Static cost-sensitive IDS,Random Forest,Shellcode,378,1.0
+B. Static cost-sensitive IDS,Random Forest,Worms,44,1.0
+B. Static cost-sensitive IDS,Logistic Regression,Analysis,677,0.9911373707533235
+B. Static cost-sensitive IDS,Logistic Regression,Backdoor,583,1.0
+B. Static cost-sensitive IDS,Logistic Regression,DoS,4089,0.9968207385668868
+B. Static cost-sensitive IDS,Logistic Regression,Exploits,11132,0.9941609773625584
+B. Static cost-sensitive IDS,Logistic Regression,Fuzzers,6062,0.9962058726492906
+B. Static cost-sensitive IDS,Logistic Regression,Generic,18871,0.9999470086375921
+B. Static cost-sensitive IDS,Logistic Regression,Reconnaissance,3496,1.0
+B. Static cost-sensitive IDS,Logistic Regression,Shellcode,378,1.0
+B. Static cost-sensitive IDS,Logistic Regression,Worms,44,1.0
+B. Static cost-sensitive IDS,MLP,Analysis,677,0.9985228951255539
+B. Static cost-sensitive IDS,MLP,Backdoor,583,1.0
+B. Static cost-sensitive IDS,MLP,DoS,4089,0.999755441428222
+B. Static cost-sensitive IDS,MLP,Exploits,11132,0.9994610132950054
+B. Static cost-sensitive IDS,MLP,Fuzzers,6062,0.998020455295282
+B. Static cost-sensitive IDS,MLP,Generic,18871,1.0
+B. Static cost-sensitive IDS,MLP,Reconnaissance,3496,0.9997139588100686
+B. Static cost-sensitive IDS,MLP,Shellcode,378,1.0
+B. Static cost-sensitive IDS,MLP,Worms,44,1.0
+C. Dynamic-cost IDS,Random Forest,Analysis,677,1.0
+C. Dynamic-cost IDS,Random Forest,Backdoor,583,1.0
+C. Dynamic-cost IDS,Random Forest,DoS,4089,1.0
+C. Dynamic-cost IDS,Random Forest,Exploits,11132,0.999910168882501
+C. Dynamic-cost IDS,Random Forest,Fuzzers,6062,0.9856483008907951
+C. Dynamic-cost IDS,Random Forest,Generic,18871,1.0
+C. Dynamic-cost IDS,Random Forest,Reconnaissance,3496,1.0
+C. Dynamic-cost IDS,Random Forest,Shellcode,378,1.0
+C. Dynamic-cost IDS,Random Forest,Worms,44,1.0
+C. Dynamic-cost IDS,Logistic Regression,Analysis,677,0.9985228951255539
+C. Dynamic-cost IDS,Logistic Regression,Backdoor,583,1.0
+C. Dynamic-cost IDS,Logistic Regression,DoS,4089,0.9987772071411103
+C. Dynamic-cost IDS,Logistic Regression,Exploits,11132,0.9978440531800216
+C. Dynamic-cost IDS,Logistic Regression,Fuzzers,6062,0.9902672385351369
+C. Dynamic-cost IDS,Logistic Regression,Generic,18871,0.9998940172751841
+C. Dynamic-cost IDS,Logistic Regression,Reconnaissance,3496,0.9994279176201373
+C. Dynamic-cost IDS,Logistic Regression,Shellcode,378,1.0
+C. Dynamic-cost IDS,Logistic Regression,Worms,44,1.0
+C. Dynamic-cost IDS,MLP,Analysis,677,0.9985228951255539
+C. Dynamic-cost IDS,MLP,Backdoor,583,1.0
+C. Dynamic-cost IDS,MLP,DoS,4089,1.0
+C. Dynamic-cost IDS,MLP,Exploits,11132,0.9998203377650018
+C. Dynamic-cost IDS,MLP,Fuzzers,6062,0.998020455295282
+C. Dynamic-cost IDS,MLP,Generic,18871,1.0
+C. Dynamic-cost IDS,MLP,Reconnaissance,3496,0.9994279176201373
+C. Dynamic-cost IDS,MLP,Shellcode,378,0.9973544973544973
+C. Dynamic-cost IDS,MLP,Worms,44,1.0
