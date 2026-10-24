@@ -12,21 +12,39 @@
 
 ## 📌 Table of Contents
 1. [Project Overview & Aim](#-project-overview--aim)
-2. [The Core Problem: Class Imbalance in NIDS](#-the-core-problem-class-imbalance-in-nids)
-3. [Dataset Architecture: UNSW-NB15](#-dataset-architecture-unsw-nb15)
-4. [Technical Architecture](#-technical-architecture)
+2. [Project Status at a Glance](#-project-status-at-a-glance)
+## 🧭 Project Status at a Glance
+
+| Stage | Status | Headline result |
+| :--- | :---: | :--- |
+| Preprocessing + baselines (RF / LR / MLP) | ✅ Done | RF: 89.3% accuracy, ROC-AUC 0.981, but FPR ≈ 20.7% on the shifted test file |
+| WGAN-GP for Shellcode + augmentation benchmark | ✅ Done (single seed) | Shellcode recall +0.8 to +1.3 pts (≈ 3–5 of 378 test flows); **needs multi-seed confirmation** |
+| Cost-sensitive study: static / dynamic / threshold / feedback / 5-seed test | ✅ Done | Cost weighting moves the operating point but does not improve ranking quality; feedback restores baseline-level ranking and does not exceed it |
+| Gate diagnostic (scarcity vs. shift vs. overlap) | 🟡 Script ready, run pending | Decides which classes the WGAN-GP should target next |
+| WGAN-GP extension + Experiment 4 (A / D / W / W+D) | ⏳ Next | |
+| Stackelberg defender–attacker stage | ⏳ Planned | Adversarial-robustness study, see [roadmap](#-roadmap--role-of-the-stackelberg-stage) |
+| Final evaluation + write-up | ⏳ Planned | |
+
+**Honest summary so far.** Cost-aware training on UNSW-NB15 trades false alarms for recall (an operating-point shift) rather than improving how well flows are ranked. A feedback loop recovers the baseline's ranking quality after weighting damages it, but does not beat the plain baseline. The weakest class is **Fuzzers** (recall at 10% FPR of only 0.47–0.55), which is *not* a scarce class (10.4% of training data). The next experiments therefore test whether the weakness is scarcity, shift, or class overlap before spending effort on generation.
+
+---
+
+3. [The Core Problem: Class Imbalance in NIDS](#-the-core-problem-class-imbalance-in-nids)
+4. [Dataset Architecture: UNSW-NB15](#-dataset-architecture-unsw-nb15)
+5. [Technical Architecture](#-technical-architecture)
    - [Pipeline Flow](#pipeline-flow)
    - [WGAN-GP Model Specifications](#wgan-gp-model-specifications)
    - [Tabular Feature Processor & Inverse Decoder](#tabular-feature-processor--inverse-decoder)
-5. [Completed Work & Milestones](#-completed-work--milestones)
-6. [Experimental Results & Benchmarks](#-experimental-results--benchmarks)
+6. [Completed Work & Milestones](#-completed-work--milestones)
+7. [Experimental Results & Benchmarks](#-experimental-results--benchmarks)
    - [Baseline Classifier Performance](#baseline-classifier-performance)
    - [WGAN-GP Augmentation Comparison](#wgan-gp-augmentation-comparison)
    - [Statistical Distribution Fidelity](#statistical-distribution-fidelity)
-7. [Repository Structure](#-repository-structure)
-8. [Installation & Setup](#-installation--setup)
-9. [Usage Guide](#-usage-guide)
-10. [Roadmap & Theoretical Future Work](#-roadmap--theoretical-future-work)
+8. [Cost-Sensitive & Feedback Experiments](#-cost-sensitive--feedback-experiments)
+9. [Repository Structure](#-repository-structure)
+10. [Installation & Setup](#-installation--setup)
+11. [Usage Guide](#-usage-guide)
+12. [Roadmap & Role of the Stackelberg Stage](#-roadmap--role-of-the-stackelberg-stage)
 
 ---
 
@@ -143,7 +161,7 @@ $$\min_{G} \max_{D \in \mathcal{D}_L} \underset{x \sim \mathbb{P}_r}{\mathbb{E}}
 * **Critic Steps ($n_{\text{critic}}$)**: 5 updates per 1 generator step
 * **Gradient Penalty Weight ($\lambda$)**: 10.0
 * **Learning Rate**: $1 \times 10^{-4}$ with Adam ($\beta_1 = 0.0, \beta_2 = 0.9$)
-* **Architectures ([wgan_gp/models.py](file:///d:/GT/Dynamic-CS-WGAN-GP-IDS/wgan_gp/models.py))**:
+* **Architectures ([wgan_gp/models.py](wgan_gp/models.py))**:
   * **Generator**: `Linear(64, 256)` $\to$ `BatchNorm1d` $\to$ `ReLU` $\to$ `Linear(256, 128)` $\to$ `BatchNorm1d` $\to$ `ReLU` $\to$ `Linear(128, D_out)` $\to$ `Tanh`
   * **Critic**: `Linear(D_in, 256)` $\to$ `LeakyReLU(0.2)` $\to$ `Linear(256, 128)` $\to$ `LeakyReLU(0.2)` $\to$ `Linear(128, 1)` (unrestricted scalar output)
 
@@ -151,7 +169,7 @@ $$\min_{G} \max_{D \in \mathcal{D}_L} \underset{x \sim \mathbb{P}_r}{\mathbb{E}}
 
 ### Tabular Feature Processor & Inverse Decoder
 
-A core contribution of this repository is the **`WGANFeatureProcessor`** ([wgan_gp/feature_preprocessing.py](file:///d:/GT/Dynamic-CS-WGAN-GP-IDS/wgan_gp/feature_preprocessing.py)):
+A core contribution of this repository is the **`WGANFeatureProcessor`** ([wgan_gp/feature_preprocessing.py](wgan_gp/feature_preprocessing.py)):
 1. **Constant Feature Isolation**: Columns with zero variance within the target subset are isolated and re-injected post-generation, preventing the GAN from learning redundant invariants.
 2. **MinMax Normalization**: Scales continuous values to $[-1, 1]$ to match the `Tanh` activation function.
 3. **Domain Range Clipping**: Closes generation leaks by strictly clipping synthetic values to empirical $[\min, \max]$ boundaries.
@@ -181,6 +199,13 @@ A core contribution of this repository is the **`WGANFeatureProcessor`** ([wgan_
 * [x] **Phase 6: Augmentation Benchmarking**
   * Retrained classifiers on combined datasets (Real Train + 1,000 Synthetic Shellcode samples).
   * Validated detection performance improvements on the untouched test set.
+
+* [x] **Phase 7: Cost-Sensitive Study (Experiments 1–3 + multi-seed test)**
+  * Static-cost and dynamic-cost (attack severity × traffic volume) IDS training via per-sample weights.
+  * Cost-aware threshold selection, with a train→test distribution-shift diagnostic.
+  * Feedback-based dynamic costing (per-attack-type FN and per-service FP multipliers) with baseline-parity targets and ranking-based round selection.
+  * 5-seed paired comparison of baseline vs. dynamic cost vs. feedback cost.
+  * Findings are summarised in [Cost-Sensitive & Feedback Experiments](#-cost-sensitive--feedback-experiments).
 
 ---
 
@@ -221,6 +246,8 @@ Benchmarking models trained on **Real Training Data** vs. **Real + 1,000 WGAN-GP
 | **WGAN-GP Augmented MLP** | **85.83%** | **80.47%** | **98.07%** | **0.8840** | **98.94% (+1.32%)** | 29.16% |
 
 > **Key Takeaway**: Augmenting the training set with WGAN-GP synthetic samples increased minority Shellcode detection from **97.62% to 98.94%** on MLP and to **98.41%** on Random Forest without inflating the False Positive Rate.
+>
+> **Caveat**: this is a single run. The Shellcode test class has only 378 flows, so +0.79 and +1.32 points correspond to roughly 3 and 5 flows. Treat the gain as promising, not established, until it is repeated over several seeds with matched-FPR metrics (see Experiment 4 in the roadmap).
 
 ---
 
@@ -237,41 +264,129 @@ Evaluated on synthetic samples generated at epoch 100 vs. real training Shellcod
 
 ---
 
+## 🧪 Cost-Sensitive & Feedback Experiments
+
+### Design
+* **Evaluation cost (fixed, fitted on train only).** FN cost = attack severity × traffic-volume factor, rescaled to a mean of 5; FP cost = volume factor, rescaled to a mean of 1. Static cost is 5:1 for every flow. *Every* model, including the baseline, is scored with both costs. Costs used for training can change (feedback); costs used for evaluation never do.
+* **Cost enters training through per-sample weights** (RF, LR) or weighted resampling (MLP). Cost-sensitive models do not use `class_weight`; the saved RF/LR baselines do (`balanced`).
+* **Two tuning modes.** `val` tunes on the 20% validation split of the train file (strict). `test_calib` tunes on a stratified 30% of the test file and reports on the remaining 70%, to separate *threshold* effects from *distribution shift*. `test_calib` uses test data for tuning and must be disclosed as such.
+* **Ranking metrics are threshold-free:** mean recall at FPR 5/10/20% (`MeanRecall@FPR`), ROC-AUC, and Fuzzers recall at 10% FPR. They separate "better ranking" from "different operating point".
+
+### Experiment 1: baseline vs. static vs. dynamic cost (full test set, one seed)
+
+| Classifier | Config | Recall | FPR | Dynamic avg cost |
+| :--- | :--- | :---: | :---: | :---: |
+| Random Forest | A. Baseline | 0.975 | 0.207 | **0.138** |
+| | B. Static cost | 0.999 | 0.402 | 0.176 |
+| | C. Dynamic cost | 0.998 | 0.394 | 0.174 |
+| Logistic Regression | A. Baseline | 0.931 | 0.280 | 0.309 |
+| | B. Static cost | 0.998 | 0.422 | 0.191 |
+| | C. Dynamic cost | 0.998 | 0.419 | **0.187** |
+| MLP | A. Baseline | 0.978 | 0.292 | **0.169** |
+| | B. Static cost | 1.000 | 0.419 | 0.183 |
+| | C. Dynamic cost | 1.000 | 0.421 | 0.183 |
+
+Cost weighting raises recall to ≈ 1.0 but doubles the FPR. Only logistic regression ends up with a lower cost than its baseline.
+
+### Experiment 2: cost-aware threshold selection
+* **The high FPR is mainly distribution shift, not the threshold.** Baseline RF has FPR 0.057 on the validation split but 0.213 on the test file at threshold 0.5 (cost-sensitive RF: 0.158 vs. 0.396). Thresholds tuned on validation do not transfer to the test file.
+* **Baselines are already near-optimal at 0.5** when tuned on shift-aware data (RF best threshold 0.51).
+* **Tuned cost-sensitive models still do not beat the baseline** (`test_calib`, dynamic avg cost):
+
+| | Baseline @0.5 | Baseline tuned | Dynamic cost @0.5 | Dynamic cost tuned |
+| :--- | :---: | :---: | :---: | :---: |
+| Random Forest | 0.1405 | 0.1395 | 0.1746 | 0.1554 |
+| MLP | 0.1715 | 0.1715 | 0.1835 | 0.1819 |
+| Logistic Regression | 0.3120 | 0.1856 | 0.1872 | 0.1849 |
+
+For logistic regression, tuning the baseline's threshold alone matches cost-sensitive training.
+* **Correction to the Experiment 1 narrative.** At matched FPR ≈ 10%, cost-sensitive training is *worse* than the baseline on Fuzzers (RF 0.581 → 0.516, MLP 0.474 → 0.355). The large recall gains in Experiment 1 came from flagging more flows, not from better detection.
+
+### Experiment 3: feedback-based dynamic costing
+Loop: train → measure per-attack-type FNR and per-service FPR on the tuning set → update group cost multipliers → retrain.
+* **Targets are baseline-parity:** each group's target error rate is the baseline's own rate on the tuning set, so the loop stops pushing once a group is no worse than the baseline.
+* **Best round is chosen by a threshold-free ranking score** (mean recall at FPR 5/10/20%), not by cost on a flat cost curve.
+* **Multipliers are damped, clipped to [0.25, 8], with a dead band;** the loop stops on convergence or after a patience limit.
+
+### Multi-seed comparison (5 seeds, `test_calib`, mean ± std)
+
+| Classifier | Config | MeanRecall@FPR | ROC-AUC | Fuzzers recall @10% FPR | Dyn. cost (tuned thr) |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| Random Forest | A. Baseline | 0.9296 ± 0.0009 | 0.9787 ± 0.0003 | **0.549 ± 0.009** | **0.1432 ± 0.0021** |
+| | C. Dynamic cost | 0.9183 ± 0.0012 | 0.9743 ± 0.0005 | 0.496 ± 0.010 | 0.1563 ± 0.0017 |
+| | D. Feedback | 0.9292 ± 0.0010 | 0.9788 ± 0.0003 | 0.530 ± 0.004 | 0.1442 ± 0.0014 |
+| MLP | A. Baseline | 0.9177 ± 0.0019 | 0.9766 ± 0.0004 | **0.490 ± 0.010** | 0.1673 ± 0.0028 |
+| | C. Dynamic cost | 0.8936 ± 0.0154 | 0.9692 ± 0.0054 | 0.391 ± 0.030 | 0.1794 ± 0.0085 |
+| | D. Feedback | 0.9157 ± 0.0035 | 0.9764 ± 0.0008 | 0.471 ± 0.020 | 0.1636 ± 0.0025 |
+
+> **Baseline note.** In this run, A was retrained *without* `class_weight`, whereas the saved RF/LR baselines use `class_weight="balanced"`. The scripts now default to `--baseline-cw balanced`; rerun `multi_seed_comparison.py` and replace this table. Ranking metrics are expected to change little; default-threshold costs may change more. This has not been verified yet.
+
+### Findings
+1. **Cost weighting is an operating-point shift, not a better detector.** It trades FPR for recall and slightly harms ranking: AUC drops by ≈ 0.004 (RF) and ≈ 0.007 (MLP), and Fuzzers recall at matched FPR drops by 0.05–0.10.
+2. **Feedback repairs that damage.** For RF, feedback beats plain dynamic cost on every ranking metric in 5/5 seeds (MeanRecall +0.011, AUC +0.0045, Fuzzers +0.034); for MLP in 4/5 seeds.
+3. **Feedback does not beat the baseline.** On ranking metrics D ≈ A, and Fuzzers recall stays *below* the baseline (RF −0.019, 5/5 seeds).
+4. **The loop learned only a global rescale.** At the selected rounds all attack-type FN multipliers were equal (≈ 0.64 for RF, ≈ 0.74 for MLP) and FP multipliers rose for `-`, `ftp`, `http` (≈ 1.4–2.1), i.e. the 5:1 cost ratio became roughly 1.5–2:1. No attack-type-specific structure was found.
+5. **Dynamic vs. static cost shows no meaningful difference** (≤ 0.003 in cost, overlapping cost curves). We do not claim the dynamic scheme is superior.
+6. **The weak spot is Fuzzers and shifted normal traffic,** not minority-class scarcity.
+
+### Limitations
+* One data split; seeds vary model randomness only. The MLP uses `max_iter=30` and is noisy.
+* `test_calib` tunes on 30% of the test file; thresholds and best-round selection come from it.
+* Cost parameters (severity table, 5:1 ratio, volume factor) are assumptions and are not validated on real operator costs.
+
+---
+
 ## 📂 Repository Structure
 
 ```
 Dynamic-CS-WGAN-GP-IDS/
 ├── baseline/
-│   ├── models/                           # Serialized models (.pkl) & validation data
-│   │   ├── logistic_regression.pkl
-│   │   ├── mlp.pkl
-│   │   ├── random_forest.pkl
-│   │   └── preprocessor.pkl
+│   ├── models/                           # Serialized models (.pkl) & preprocessor
 │   ├── evaluate.py                       # Evaluates baselines on test set
 │   └── train.py                          # Fits baseline classifiers
+├── cost_sensitive/                       # Experiment 1
+│   ├── cost_module.py                    # StaticCost / DynamicCost (shared cost API)
+│   ├── train_cost_sensitive.py           # Static- and dynamic-cost training
+│   ├── evaluate_cost_sensitive.py        # A/B/C comparison, per-category recall
+│   └── models/                           # *_static.pkl, *_dynamic.pkl, cost_*.pkl
+├── shared/
+│   └── exp_common.py                     # Splits, thresholds, ranking metrics (Exp 2+)
+├── threshold_opt/                        # Experiment 2
+│   ├── threshold_optimization.py         # Cost-aware thresholds, shift diagnostic
+│   └── group_diagnostic.py               # FPR by service, recall by attack type at matched FPR
+├── feedback_cost/                        # Experiment 3 + multi-seed
+│   ├── feedback_cost_module.py           # FeedbackCost (same API as cost_module)
+│   ├── feedback_loop.py                  # Shared loop, targets, round selection
+│   ├── train_feedback.py                 # Single-seed feedback run
+│   ├── multi_seed_comparison.py          # Paired A vs C vs D over seeds
+│   └── models/                           # Best-round feedback models + costs
+├── diagnostics/
+│   └── gate_diagnostic.py                # Scarcity vs. shift vs. overlap, per attack type
 ├── data/
 │   ├── raw/                              # Place UNSW_NB15 CSV files here (gitignored)
-│   └── attack_distribution.png           # Attack frequency plot
+│   └── attack_distribution.png
 ├── notebooks/
-│   └── dataset_analysis.ipynb            # Exploratory Data Analysis
+│   └── dataset_analysis.ipynb
 ├── preprocessing/
-│   └── preprocess.py                     # Initial feature transformations
-├── results/
-│   ├── baseline_results.csv              # Overall baseline metrics
-│   ├── wgan_gp_augmentation_comparison.csv # Baseline vs Augmented results
-│   ├── wgan_gp_distribution_comparison.csv # KS and TVD statistical metrics
-│   └── *_attack_category_results.csv     # Granular attack category recall tables
+│   └── preprocess.py
+├── results/                              # All CSV/PNG outputs
+│   ├── baseline_results.csv, wgan_gp_*.csv, *_attack_category_results.csv
+│   ├── cost_comparison_*.csv             # Exp 1
+│   ├── exp2_*                            # Exp 2 (val / test_calib)
+│   ├── exp3v2_*                          # Exp 3 single seed
+│   ├── multiseed_*                       # Multi-seed raw / summary / paired
+│   └── diag_*                            # Diagnostics
 ├── wgan_gp/
-│   ├── compare_augmentation.py           # Augmentation experiment suite
-│   ├── compare_distributions.py          # Distribution fidelity analysis
-│   ├── config.py                         # Hyperparameters & paths
-│   ├── data_utils.py                     # Split reproduction & category slicing
-│   ├── feature_preprocessing.py          # Domain-aware WGAN feature processor
-│   ├── generate.py                       # Sample generator & inverse decoder
-│   ├── losses.py                         # Wasserstein loss & gradient penalty
-│   ├── models.py                         # PyTorch Generator & Critic
-│   ├── train.py                          # WGAN-GP training loop
-│   └── validate_synthetic.py             # Integrity & boundary validation
+│   ├── compare_augmentation.py
+│   ├── compare_distributions.py
+│   ├── config.py
+│   ├── data_utils.py
+│   ├── feature_preprocessing.py
+│   ├── generate.py
+│   ├── losses.py
+│   ├── models.py
+│   ├── train.py
+│   └── validate_synthetic.py
 ├── .gitignore
 ├── LICENSE
 └── README.md
@@ -356,31 +471,75 @@ python -m wgan_gp.compare_augmentation
 
 ---
 
-## 🔮 Roadmap & Theoretical Future Work
+### 6. Cost-Sensitive Study (Experiments 1–3)
+Scripts live in plain folders (not packages); run them from the project root:
+```bash
+# Experiment 1: static / dynamic cost training and A-B-C comparison
+python cost_sensitive/train_cost_sensitive.py
+python cost_sensitive/evaluate_cost_sensitive.py
 
-Building on the current generative foundation, this project is expanding into game-theoretic and dynamic cost optimization:
+# Experiment 2: cost-aware thresholds (run both tuning modes) + group diagnostic
+python threshold_opt/threshold_optimization.py --tuning-source val
+python threshold_opt/threshold_optimization.py --tuning-source test_calib
+python threshold_opt/group_diagnostic.py --tuning-source test_calib
+
+# Experiment 3: feedback-based costs (single seed, then 5-seed comparison)
+python feedback_cost/train_feedback.py --tuning-source test_calib
+python feedback_cost/multi_seed_comparison.py --tuning-source test_calib --seeds 42 43 44 45 46
+```
+`multi_seed_comparison.py` writes partial results after every (seed, classifier), so an interrupted run is still usable. Use `--rounds 4 --seeds 42 43` for a quick test.
+
+### 7. Gate Diagnostic (run before extending the WGAN-GP)
+```bash
+python diagnostics/gate_diagnostic.py
+```
+Reports per attack type whether the weakness is **scarcity**, **train→test shift**, or **overlap with normal traffic**, using class counts, one-vs-Normal AUC on validation vs. test, a specialist classifier, and a train-vs-test domain classifier.
+
+---
+
+## 🔮 Roadmap & Role of the Stackelberg Stage
 
 ```
-[Phase 1 & 2: Preprocessing + Baselines]   --> COMPLETED
-[Phase 3 & 4: WGAN-GP + Domain Decoding]  --> COMPLETED
-[Phase 5: Augmentation Benchmarking]      --> COMPLETED
-     │
+[Phases 1–5: Preprocessing, baselines, WGAN-GP (Shellcode), validation, augmentation]  --> COMPLETED
+[Phase 7: Cost-sensitive study (static, dynamic, threshold, feedback, 5 seeds)]       --> COMPLETED
+     │   result: cost = operating-point control; feedback restores baseline ranking
      ▼
-[Phase 6: Dynamic Cost-Sensitive Learning (CS-WGAN-GP)]
-     │  - Integrate cost matrix C(y, y_pred) dynamically adjusted per epoch
-     │  - Weight generator/critic feedback using misclassification severity
+[Phase 8: Gate diagnostic]  -- scarcity / shift / overlap per attack type
      ▼
-[Phase 7: Stackelberg Game-Theoretic Equilibrium]
-     │  - Model Leader (IDS Defender) and Follower (Adversarial Generator)
-     │  - Compute Stackelberg Equilibrium for worst-case robust defense
+[Phase 9: WGAN-GP extension + Experiment 4]   A baseline | D feedback cost | W synthetic | W+D
+     │   multi-seed, matched-FPR metrics; target classes chosen by the gate diagnostic
+     ▼
+[Phase 10: Stackelberg defender–attacker study]  adversarial robustness
+     ▼
+[Phase 11: Final evaluation + write-up]
 ```
 
-1. **Dynamic Cost-Sensitive (CS) Weighting**:
-   * Implement an asymmetric loss function penalizing False Negatives on rare, catastrophic attacks ($C_{\text{FN}} \gg C_{\text{FP}}$) dynamically derived from evasion difficulty.
-2. **Stackelberg Game Formulation**:
-   * Formulate the interplay between the IDS Defender (Leader) and the Generative Attacker (Follower) as a bilevel optimization game, computing equilibrium strategies where the defender minimizes evasion risk against an optimal evasion adversary.
-3. **Multi-Category Generative Expansion**:
-   * Extend the target category beyond Shellcode to multi-minority attacks (`Worms`, `Backdoor`, `Analysis`).
+### Next steps
+1. **Rerun the multi-seed comparison with `--baseline-cw balanced`** so that A matches the saved baseline, and update the results table.
+2. **Run `diagnostics/gate_diagnostic.py`.** If Fuzzers are flagged SHIFT or OVERLAP rather than SCARCE, synthetic data drawn from the training distribution is unlikely to fix them; report that, or target the genuinely scarce classes instead (Worms, Shellcode, Analysis, Backdoor).
+3. **Repeat the existing Shellcode augmentation over 5 seeds** with matched-FPR metrics before claiming the +0.8 to +1.3 point gain.
+4. **Experiment 4:** compare A / D / W / W+D with the existing generator. Generate in raw feature space (the `WGANFeatureProcessor` inverse decoder already does this), so synthetic rows keep the raw fields (`sbytes`, `dbytes`, `attack_cat`, `service`) that the cost module needs. Keep synthetic rows out of the tuning set; evaluate on real data only; decide the success criterion in advance (e.g. beat A on `MeanRecall@FPR` and on the target-class recall by more than the seed standard deviation).
+5. **Stackelberg stage** (below).
+
+### Role of the Stackelberg stage
+**Why it is here.** Experiments 1–3 show that, on the static UNSW-NB15 test set, cost weighting cannot improve ranking quality, and the remaining errors come from shift and class overlap. Costs are therefore not the lever for *static* accuracy. The README's second core problem, **adaptive evasion**, is something a static test set cannot measure at all. The Stackelberg stage is the part of the project that addresses it, and it gives the WGAN-GP a second purpose beyond oversampling: it becomes the attacker's strategy space.
+
+**Formulation.**
+* **Leader (defender)** commits first to θ = (classifier parameters, cost multipliers m, decision threshold t).
+* **Follower (attacker)** observes θ and best-responds with an attack mix π and/or a perturbation of flows, drawn from the WGAN-GP generator G(z, c) under domain constraints (integer counts, valid protocol states, immutable fields such as protocol and service held fixed so the attack keeps its function).
+* **Defender loss:** severity- and volume-weighted FN cost plus FP cost (the existing cost module).
+* **Attacker utility:** severity-weighted evasion rate minus a realism / perturbation cost.
+* **Equilibrium:** θ* = argmin over θ of the defender loss evaluated at the attacker's best response BR(θ).
+
+**What it adds beyond the current feedback loop.**
+* The feedback loop's rule is a heuristic and found no attack-type structure. In a Stackelberg game, the attacker's equilibrium attack mix indicates which categories deserve higher FN cost, which gives the multipliers a principled origin.
+* It measures robustness to adaptive attackers, which accuracy on the fixed test set does not.
+
+**What it cannot do.** It does not fix train→test distribution shift, and it does not guarantee a better static test score. It should be judged on robustness, with clean-test performance reported to show there is no regression.
+
+### Other planned extensions
+* **Multi-category generative expansion** beyond Shellcode, guided by the gate diagnostic.
+* **Realistic cost modelling:** replace the assumed severity table and 5:1 ratio with operator-derived costs, or report results over a range of ratios.
 
 ## Dataset Acknowledgements
 
