@@ -1,0 +1,65 @@
+{
+  "A. Baseline | Random Forest": {
+    "default_0.50": 0.5,
+    "static_opt": 0.44,
+    "dynamic_opt": 0.51,
+    "fpr_cap_0.10": 0.7,
+    "ORACLE_dynamic (diagnostic)": 0.51
+  },
+  "A. Baseline | Logistic Regression": {
+    "default_0.50": 0.5,
+    "static_opt": 0.05,
+    "dynamic_opt": 0.06,
+    "fpr_cap_0.10": 0.67,
+    "ORACLE_dynamic (diagnostic)": 0.05
+  },
+  "A. Baseline | MLP": {
+    "default_0.50": 0.5,
+    "static_opt": 0.47,
+    "dynamic_opt": 0.5,
+    "fpr_cap_0.10": 0.82,
+    "ORACLE_dynamic (diagnostic)": 0.59
+  },
+  "B. Static-cost | Random Forest": {
+    "default_0.50": 0.5,
+    "static_opt": 0.66,
+    "dynamic_opt": 0.79,
+    "fpr_cap_0.10": 0.91,
+    "ORACLE_dynamic (diagnostic)": 0.76
+  },
+  "B. Static-cost | Logistic Regression": {
+    "default_0.50": 0.5,
+    "static_opt": 0.38,
+    "dynamic_opt": 0.38,
+    "fpr_cap_0.10": 0.96,
+    "ORACLE_dynamic (diagnostic)": 0.3
+  },
+  "B. Static-cost | MLP": {
+    "default_0.50": 0.5,
+    "static_opt": 0.75,
+    "dynamic_opt": 0.83,
+    "fpr_cap_0.10": 0.96,
+    "ORACLE_dynamic (diagnostic)": 0.82
+  },
+  "C. Dynamic-cost | Random Forest": {
+    "default_0.50": 0.5,
+    "static_opt": 0.7,
+    "dynamic_opt": 0.73,
+    "fpr_cap_0.10": 0.89,
+    "ORACLE_dynamic (diagnostic)": 0.73
+  },
+  "C. Dynamic-cost | Logistic Regression": {
+    "default_0.50": 0.5,
+    "static_opt": 0.43,
+    "dynamic_opt": 0.43,
+    "fpr_cap_0.10": 0.96,
+    "ORACLE_dynamic (diagnostic)": 0.43
+  },
+  "C. Dynamic-cost | MLP": {
+    "default_0.50": 0.5,
+    "static_opt": 0.67,
+    "dynamic_opt": 0.77,
+    "fpr_cap_0.10": 0.98,
+    "ORACLE_dynamic (diagnostic)": 0.68
+  }
+}

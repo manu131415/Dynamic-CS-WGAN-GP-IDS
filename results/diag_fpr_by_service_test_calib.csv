@@ -1,0 +1,64 @@
+Config,Classifier,service,n_normal,FPR@0.5
+A,Random Forest,-,19175,0.24041720990873533
+A,Random Forest,ftp,510,0.36470588235294116
+A,Random Forest,http,2827,0.253979483551468
+A,Random Forest,dns,2152,0.009758364312267658
+A,Random Forest,ftp-data,641,0.0
+A,Random Forest,smtp,450,0.0
+A,Random Forest,ssh,145,0.0
+A,Logistic Regression,-,19175,0.2965319426336375
+A,Logistic Regression,ftp,510,0.3411764705882353
+A,Logistic Regression,http,2827,0.511496285815352
+A,Logistic Regression,dns,2152,0.010223048327137546
+A,Logistic Regression,ftp-data,641,0.0
+A,Logistic Regression,smtp,450,0.0
+A,Logistic Regression,ssh,145,0.0
+A,MLP,-,19175,0.3340286831812255
+A,MLP,ftp,510,0.44509803921568625
+A,MLP,http,2827,0.3494870887866997
+A,MLP,dns,2152,0.0023234200743494425
+A,MLP,ftp-data,641,0.0
+A,MLP,smtp,450,0.0
+A,MLP,ssh,145,0.0
+B,Random Forest,-,19175,0.44245110821382005
+B,Random Forest,ftp,510,0.5803921568627451
+B,Random Forest,http,2827,0.5808277325787053
+B,Random Forest,dns,2152,0.010223048327137546
+B,Random Forest,ftp-data,641,0.0
+B,Random Forest,smtp,450,0.0
+B,Random Forest,ssh,145,0.0
+B,Logistic Regression,-,19175,0.46628422425032595
+B,Logistic Regression,ftp,510,0.5882352941176471
+B,Logistic Regression,http,2827,0.5925008843296781
+B,Logistic Regression,dns,2152,0.010223048327137546
+B,Logistic Regression,ftp-data,641,0.0015600624024961
+B,Logistic Regression,smtp,450,0.0
+B,Logistic Regression,ssh,145,0.0
+B,MLP,-,19175,0.46435462842242503
+B,MLP,ftp,510,0.5764705882352941
+B,MLP,http,2827,0.5886098337460205
+B,MLP,dns,2152,0.0018587360594795538
+B,MLP,ftp-data,641,0.0
+B,MLP,smtp,450,0.0
+B,MLP,ssh,145,0.0
+C,Random Forest,-,19175,0.4327509778357236
+C,Random Forest,ftp,510,0.5705882352941176
+C,Random Forest,http,2827,0.582950123806155
+C,Random Forest,dns,2152,0.010223048327137546
+C,Random Forest,ftp-data,641,0.0
+C,Random Forest,smtp,450,0.0
+C,Random Forest,ssh,145,0.0
+C,Logistic Regression,-,19175,0.4622685788787484
+C,Logistic Regression,ftp,510,0.5882352941176471
+C,Logistic Regression,http,2827,0.5925008843296781
+C,Logistic Regression,dns,2152,0.010687732342007435
+C,Logistic Regression,ftp-data,641,0.0015600624024961
+C,Logistic Regression,smtp,450,0.0
+C,Logistic Regression,ssh,145,0.0
+C,MLP,-,19175,0.46691003911342893
+C,MLP,ftp,510,0.5882352941176471
+C,MLP,http,2827,0.5861337106473293
+C,MLP,dns,2152,0.0023234200743494425
+C,MLP,ftp-data,641,0.0
+C,MLP,smtp,450,0.0
+C,MLP,ssh,145,0.0
