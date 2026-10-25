@@ -30,7 +30,12 @@ ap.add_argument("--eta", type=float, default=0.35)
 ap.add_argument("--patience", type=int, default=2)
 ap.add_argument("--target-slack", type=float, default=1.0)
 ap.add_argument("--fpr-cap", type=float, default=0.10)
+ap.add_argument("--baseline-cw", default="balanced", choices=["balanced", "none"],
+                help="class_weight of baseline A (RF/LR). Your saved baselines use balanced (README).")
+ap.add_argument("--out-suffix", default="", help="e.g. _cwbalanced to keep earlier result files")
 args = ap.parse_args()
+BASE_CW = None if args.baseline_cw == "none" else "balanced"
+SUF = args.out_suffix
 tag = args.tuning_source
 pretty = {v: k for k, v in CLASSIFIERS.items()}
 CFG_A, CFG_C, CFG_D = "A. Baseline", "C. Dynamic (round 0)", "D. Feedback (best)"
@@ -38,12 +43,12 @@ FZ = f"Fuzzers_Recall@FPR{FUZZ_CAP}"
 
 ctx = make_context(tag)
 rows, hist = [], []
-out_raw = RESULTS_DIR / f"multiseed_raw_{tag}.csv"
+out_raw = RESULTS_DIR / f"multiseed_raw_{tag}{SUF}.csv"
 
 for seed in args.seeds:
     for name in args.classifiers:
         print(f"\n##### seed {seed} | {name} | tuning={tag}")
-        A = fit_model(ctx, name, seed, rf_trees=args.rf_trees)
+        A = fit_model(ctx, name, seed, rf_trees=args.rf_trees, baseline_cw=BASE_CW)
         pA_t, pA_f = A.predict_proba(ctx.X_t)[:, 1], A.predict_proba(ctx.X_f)[:, 1]
 
         if seed == args.seeds[0] and (BASE_DIR / f"{name}.pkl").exists():     # sanity check
@@ -53,7 +58,7 @@ for seed in args.seeds:
             print(f"  [check] saved baseline: DynCost@0.5={ps['Dynamic_Avg_Cost']:.4f} "
                   f"MeanRecall@FPR={ps['MeanRecall@FPR']:.4f} | retrained A: "
                   f"{pa['Dynamic_Avg_Cost']:.4f} / {pa['MeanRecall@FPR']:.4f}  "
-                  f"(large gaps => your baseline used different hyper-parameters, e.g. class_weight)")
+                  f"(retrained A uses class_weight=" + str(BASE_CW) + "; large gaps => settings differ from your saved baseline)")
 
         res = run_feedback_loop(ctx, name, seed, rounds=args.rounds, eta=args.eta,
                                 target_mode="baseline", p_base=pA_t, slack=args.target_slack,
@@ -70,7 +75,7 @@ for seed in args.seeds:
         pd.DataFrame(rows).to_csv(out_raw, index=False)                       # partial save
 
 df = pd.DataFrame(rows)
-pd.DataFrame(hist).to_csv(RESULTS_DIR / f"multiseed_history_{tag}.csv", index=False)
+pd.DataFrame(hist).to_csv(RESULTS_DIR / f"multiseed_history_{tag}{SUF}.csv", index=False)
 
 # ---------------- summary: mean +- std ----------------
 METRICS = ["Dynamic_Avg_Cost", "Recall", "FPR", "MeanRecall@FPR", "ROC-AUC", FZ]
@@ -78,7 +83,7 @@ g = df.groupby(["Classifier", "OperatingPoint", "Config"])[METRICS].agg(["mean",
 summary = pd.DataFrame(index=g.index)
 for m in METRICS:
     summary[m] = [f"{a:.4f} ± {0 if np.isnan(b) else b:.4f}" for a, b in zip(g[(m, "mean")], g[(m, "std")])]
-summary.to_csv(RESULTS_DIR / f"multiseed_summary_{tag}.csv")
+summary.to_csv(RESULTS_DIR / f"multiseed_summary_{tag}{SUF}.csv")
 
 # ---------------- paired differences ----------------
 try:
@@ -104,7 +109,7 @@ for clf in df.Classifier.unique():
                                     "Std_diff": diff.std(), "D_better_in": f"{wins}/{len(diff)} seeds",
                                     "paired_t_p": p, "better_direction": "higher" if hb else "lower"})
 paired = pd.DataFrame(paired_rows)
-paired.to_csv(RESULTS_DIR / f"multiseed_paired_{tag}.csv", index=False)
+paired.to_csv(RESULTS_DIR / f"multiseed_paired_{tag}{SUF}.csv", index=False)
 
 pd.set_option("display.width", 250); pd.set_option("display.max_columns", None)
 print(f"\n=== MULTI-SEED SUMMARY | tuning={tag} | seeds={args.seeds} | final n={len(ctx.raw_f)} ===")
