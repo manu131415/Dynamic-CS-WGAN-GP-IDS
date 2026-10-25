@@ -20,12 +20,12 @@
 | Preprocessing + baselines (RF / LR / MLP) | ✅ Done | RF: 89.3% accuracy, ROC-AUC 0.981, but FPR ≈ 20.7% on the shifted test file |
 | WGAN-GP for Shellcode + augmentation benchmark | ✅ Done (single seed) | Shellcode recall +0.8 to +1.3 pts (≈ 3–5 of 378 test flows); **needs multi-seed confirmation** |
 | Cost-sensitive study: static / dynamic / threshold / feedback / 5-seed test | ✅ Done | Cost weighting moves the operating point but does not improve ranking quality; feedback restores baseline-level ranking and does not exceed it |
-| Gate diagnostic (scarcity vs. shift vs. overlap) | 🟡 Script ready, run pending | Decides which classes the WGAN-GP should target next |
+| Gate diagnostic (scarcity vs. shift vs. overlap) | ✅ Done | Fuzzers = train→test **shift** (not scarcity); Shellcode = scarce with almost no shift; normal traffic itself is shifted (domain AUC 0.90) |
 | WGAN-GP extension + Experiment 4 (A / D / W / W+D) | ⏳ Next | |
 | Stackelberg defender–attacker stage | ⏳ Planned | Adversarial-robustness study, see [roadmap](#-roadmap--role-of-the-stackelberg-stage) |
 | Final evaluation + write-up | ⏳ Planned | |
 
-**Honest summary so far.** Cost-aware training on UNSW-NB15 trades false alarms for recall (an operating-point shift) rather than improving how well flows are ranked. A feedback loop recovers the baseline's ranking quality after weighting damages it, but does not beat the plain baseline. The weakest class is **Fuzzers** (recall at 10% FPR of only 0.47–0.55), which is *not* a scarce class (10.4% of training data). The next experiments therefore test whether the weakness is scarcity, shift, or class overlap before spending effort on generation.
+**Honest summary so far.** Cost-aware training on UNSW-NB15 trades false alarms for recall (an operating-point shift) rather than improving how well flows are ranked. A feedback loop recovers the baseline's ranking quality after weighting damages it, but does not beat the plain baseline. The weakest class is **Fuzzers** (recall at 10% FPR of only 0.47–0.55), which is *not* a scarce class (10.4% of training data). The gate diagnostic confirms that the Fuzzers weakness is train→test distribution shift, so synthetic data drawn from the training set is unlikely to fix it; generation should target the genuinely scarce classes instead (Shellcode first).
 
 ---
 
@@ -309,30 +309,47 @@ Loop: train → measure per-attack-type FNR and per-service FPR on the tuning se
 * **Multipliers are damped, clipped to [0.25, 8], with a dead band;** the loop stops on convergence or after a patience limit.
 
 ### Multi-seed comparison (5 seeds, `test_calib`, mean ± std)
+Baseline A is retrained with `class_weight="balanced"` for RF and LR, like the saved baselines. Sanity check: the retrained MLP at seed 42 reproduces the saved MLP exactly (dynamic cost 0.1715, MeanRecall@FPR 0.9165).
 
-| Classifier | Config | MeanRecall@FPR | ROC-AUC | Fuzzers recall @10% FPR | Dyn. cost (tuned thr) |
-| :--- | :--- | :---: | :---: | :---: | :---: |
-| Random Forest | A. Baseline | 0.9296 ± 0.0009 | 0.9787 ± 0.0003 | **0.549 ± 0.009** | **0.1432 ± 0.0021** |
-| | C. Dynamic cost | 0.9183 ± 0.0012 | 0.9743 ± 0.0005 | 0.496 ± 0.010 | 0.1563 ± 0.0017 |
-| | D. Feedback | 0.9292 ± 0.0010 | 0.9788 ± 0.0003 | 0.530 ± 0.004 | 0.1442 ± 0.0014 |
-| MLP | A. Baseline | 0.9177 ± 0.0019 | 0.9766 ± 0.0004 | **0.490 ± 0.010** | 0.1673 ± 0.0028 |
-| | C. Dynamic cost | 0.8936 ± 0.0154 | 0.9692 ± 0.0054 | 0.391 ± 0.030 | 0.1794 ± 0.0085 |
-| | D. Feedback | 0.9157 ± 0.0035 | 0.9764 ± 0.0008 | 0.471 ± 0.020 | 0.1636 ± 0.0025 |
-
-> **Baseline note.** In this run, A was retrained *without* `class_weight`, whereas the saved RF/LR baselines use `class_weight="balanced"`. The scripts now default to `--baseline-cw balanced`; rerun `multi_seed_comparison.py` and replace this table. Ranking metrics are expected to change little; default-threshold costs may change more. This has not been verified yet.
+| Classifier | Config | MeanRecall@FPR | ROC-AUC | Fuzzers recall @10% FPR | Dyn. cost @ thr 0.5 | Dyn. cost (tuned thr) |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| Random Forest | A. Baseline | 0.9363 ± 0.0011 | 0.9813 ± 0.0003 | **0.574 ± 0.013** | **0.1380 ± 0.0015** | 0.1381 ± 0.0012 |
+| | C. Dynamic cost | 0.9183 ± 0.0012 | 0.9743 ± 0.0005 | 0.496 ± 0.010 | 0.1743 ± 0.0004 | 0.1563 ± 0.0017 |
+| | D. Feedback | 0.9356 ± 0.0010 | 0.9811 ± 0.0003 | 0.562 ± 0.011 | 0.1401 ± 0.0011 | **0.1378 ± 0.0008** |
+| MLP | A. Baseline | 0.9177 ± 0.0019 | 0.9766 ± 0.0004 | **0.490 ± 0.010** | **0.1676 ± 0.0032** | 0.1673 ± 0.0028 |
+| | C. Dynamic cost | 0.8936 ± 0.0154 | 0.9692 ± 0.0054 | 0.391 ± 0.030 | 0.1843 ± 0.0008 | 0.1794 ± 0.0085 |
+| | D. Feedback | 0.9157 ± 0.0035 | 0.9764 ± 0.0008 | 0.471 ± 0.020 | 0.1729 ± 0.0076 | **0.1636 ± 0.0025** |
 
 ### Findings
-1. **Cost weighting is an operating-point shift, not a better detector.** It trades FPR for recall and slightly harms ranking: AUC drops by ≈ 0.004 (RF) and ≈ 0.007 (MLP), and Fuzzers recall at matched FPR drops by 0.05–0.10.
-2. **Feedback repairs that damage.** For RF, feedback beats plain dynamic cost on every ranking metric in 5/5 seeds (MeanRecall +0.011, AUC +0.0045, Fuzzers +0.034); for MLP in 4/5 seeds.
-3. **Feedback does not beat the baseline.** On ranking metrics D ≈ A, and Fuzzers recall stays *below* the baseline (RF −0.019, 5/5 seeds).
-4. **The loop learned only a global rescale.** At the selected rounds all attack-type FN multipliers were equal (≈ 0.64 for RF, ≈ 0.74 for MLP) and FP multipliers rose for `-`, `ftp`, `http` (≈ 1.4–2.1), i.e. the 5:1 cost ratio became roughly 1.5–2:1. No attack-type-specific structure was found.
+1. **Cost weighting is an operating-point shift, not a better detector.** It raises recall to ≈ 0.998 but lifts RF's FPR from 0.21 to 0.40, and it slightly harms ranking: ROC-AUC drops by ≈ 0.007 (RF and MLP) and Fuzzers recall at matched FPR drops by about 0.08 (RF) and 0.10 (MLP).
+2. **Feedback repairs that damage.** For RF, feedback beats plain dynamic cost on every ranking metric in 5/5 seeds (MeanRecall +0.017, AUC +0.007, Fuzzers +0.066, p ≤ 0.001); for MLP in 4/5 seeds (p ≈ 0.02–0.05, noisier).
+3. **Feedback does not beat the baseline.** RF ranking is tied (MeanRecall −0.0006, AUC −0.0002, not significant) and Fuzzers recall is slightly lower (−0.012, p = 0.28). At the default threshold feedback costs slightly *more* (RF 0.1401 vs 0.1380, worse in 5/5 seeds) because the loop stops inside its 20% dead band around the baseline FPR (0.25 vs 0.21). At a tuned or FPR-capped threshold the two are tied. The MLP's tuned-threshold cost is lower (0.1636 vs 0.1673) but not significant (3/5 seeds, p = 0.18).
+4. **The loop learned only a global rescale, in the direction of balanced weighting.** At the selected rounds all attack-type FN multipliers were equal (≈ 0.45 for RF, ≈ 0.74 for MLP) and FP multipliers rose for `-` (2.0), `ftp` (2.2) and `http` (3.1) for RF. The effective FN:FP weight ratio fell from 5:1 to about 1:1 (RF) and about 2.5:1 (MLP), close to the baseline's own balanced weighting. No attack-type-specific structure was found.
 5. **Dynamic vs. static cost shows no meaningful difference** (≤ 0.003 in cost, overlapping cost curves). We do not claim the dynamic scheme is superior.
 6. **The weak spot is Fuzzers and shifted normal traffic,** not minority-class scarcity.
+7. **A class-balanced baseline is a strong reference.** Compared with an unweighted RF in an earlier run with the same seeds, balanced weights gave better ranking (AUC 0.9813 vs 0.9787, Fuzzers 0.574 vs 0.549). Balanced weighting upweights normal flows, the opposite direction to FN-heavy cost weighting. A plausible reason is that normal traffic is the class that shifted most, but this was not tested directly.
 
 ### Limitations
 * One data split; seeds vary model randomness only. The MLP uses `max_iter=30` and is noisy.
 * `test_calib` tunes on 30% of the test file; thresholds and best-round selection come from it.
 * Cost parameters (severity table, 5:1 ratio, volume factor) are assumptions and are not validated on real operator costs.
+
+### Gate diagnostic: scarcity vs. shift vs. overlap
+AUC = attack type vs. Normal. "Domain AUC" = how well a classifier can tell *train* flows from *test* flows of the same class (0.5 = no shift, 1.0 = fully separable).
+
+| Class | n (train) | Baseline RF AUC val → test | Specialist AUC val → test | Domain AUC | Verdict |
+| :--- | ---: | :---: | :---: | :---: | :---: |
+| Fuzzers | 14,510 | 0.966 → 0.895 | 0.971 → 0.882 | **0.953** | SHIFT |
+| Shellcode | 908 | 0.993 → 0.976 | 0.999 → 0.996 | 0.560 | SCARCE |
+| Normal | 44,800 | n/a | n/a | **0.904** | (shifted) |
+| Analysis / Backdoor / Worms | 1,578 / 1,432 / 102 | test AUC 0.987 / 0.993 / 0.991 | n/a | n/a | SCARCE, near ceiling |
+| DoS, Exploits, Generic, Reconnaissance | 8k–32k | test AUC 0.990–0.998 | n/a | n/a | ok |
+
+* **Fuzzers are not scarce, they are shifted.** A dedicated Fuzzers-vs-Normal model drops from 0.971 to 0.882 AUC, so more or better-targeted training data from the same distribution is not the fix. The most shifted features for Fuzzers are the windowed connection-count features (`ct_dst_src_ltm` alone carries 0.21 of the domain classifier's importance, then `ct_srv_dst`, `ct_srv_src`).
+* **Normal traffic itself shifted** (domain AUC 0.90), mainly in timing and rate features (`sinpkt`, `dinpkt`, `ackdat`, `dur`, `sload`, `dload`, `rate`) plus `ct_dst_src_ltm`. This is consistent with the FPR jump from about 0.06 on validation to about 0.21 on test.
+* **Shellcode is the one class where generation is well motivated:** scarce (908 flows), almost no shift (domain AUC 0.56), and a specialist model reaches 0.996 test AUC against 0.976 for the baseline RF, so there is measurable room.
+* **Analysis, Backdoor and Worms are scarce but already near the ceiling,** and Worms has only 44 test flows (one flow is 2.3 points of recall), so gains on them will be hard to measure.
+* The SCARCE/SHIFT/OVERLAP thresholds are heuristic choices; the underlying numbers are in `results/diag_gate_summary.csv` and `results/diag_gate_domain_shift.csv`.
 
 ---
 
@@ -504,7 +521,7 @@ Reports per attack type whether the weakness is **scarcity**, **train→test shi
 [Phase 7: Cost-sensitive study (static, dynamic, threshold, feedback, 5 seeds)]       --> COMPLETED
      │   result: cost = operating-point control; feedback restores baseline ranking
      ▼
-[Phase 8: Gate diagnostic]  -- scarcity / shift / overlap per attack type
+[Phase 8: Gate diagnostic]  -- scarcity / shift / overlap per attack type   --> COMPLETED
      ▼
 [Phase 9: WGAN-GP extension + Experiment 4]   A baseline | D feedback cost | W synthetic | W+D
      │   multi-seed, matched-FPR metrics; target classes chosen by the gate diagnostic
@@ -515,11 +532,12 @@ Reports per attack type whether the weakness is **scarcity**, **train→test shi
 ```
 
 ### Next steps
-1. **Rerun the multi-seed comparison with `--baseline-cw balanced`** so that A matches the saved baseline, and update the results table.
-2. **Run `diagnostics/gate_diagnostic.py`.** If Fuzzers are flagged SHIFT or OVERLAP rather than SCARCE, synthetic data drawn from the training distribution is unlikely to fix them; report that, or target the genuinely scarce classes instead (Worms, Shellcode, Analysis, Backdoor).
-3. **Repeat the existing Shellcode augmentation over 5 seeds** with matched-FPR metrics before claiming the +0.8 to +1.3 point gain.
-4. **Experiment 4:** compare A / D / W / W+D with the existing generator. Generate in raw feature space (the `WGANFeatureProcessor` inverse decoder already does this), so synthetic rows keep the raw fields (`sbytes`, `dbytes`, `attack_cat`, `service`) that the cost module needs. Keep synthetic rows out of the tuning set; evaluate on real data only; decide the success criterion in advance (e.g. beat A on `MeanRecall@FPR` and on the target-class recall by more than the seed standard deviation).
-5. **Stackelberg stage** (below).
+1. ~~Rerun the multi-seed comparison with `--baseline-cw balanced`~~ **Done.** The results above use the matched baseline.
+2. **Shift ablation (new).** Retrain the baseline without the most shifted feature groups (`ct_*` window counts, then timing/rate features) and check whether test FPR and Fuzzers AUC improve. This is a direct test of the shift explanation. Note that choosing features by looking at *unlabeled test features* is mildly test-informed, so disclose it.
+3. **Target generation at Shellcode first** (scarce, little shift, measurable headroom), then Analysis/Backdoor. Treat Fuzzers as a pre-registered negative control: a WGAN-GP trained on the training distribution is not expected to help.
+4. **Repeat the existing Shellcode augmentation over 5 seeds** with matched-FPR metrics before claiming the +0.8 to +1.3 point gain.
+5. **Experiment 4:** compare A / D / W / W+D with the existing generator. Generate in raw feature space (the `WGANFeatureProcessor` inverse decoder already does this), so synthetic rows keep the raw fields (`sbytes`, `dbytes`, `attack_cat`, `service`) that the cost module needs. Keep synthetic rows out of the tuning set; evaluate on real data only; decide the success criterion in advance (e.g. beat A on `MeanRecall@FPR` and on the target-class recall by more than the seed standard deviation).
+6. **Stackelberg stage** (below).
 
 ### Role of the Stackelberg stage
 **Why it is here.** Experiments 1–3 show that, on the static UNSW-NB15 test set, cost weighting cannot improve ranking quality, and the remaining errors come from shift and class overlap. Costs are therefore not the lever for *static* accuracy. The README's second core problem, **adaptive evasion**, is something a static test set cannot measure at all. The Stackelberg stage is the part of the project that addresses it, and it gives the WGAN-GP a second purpose beyond oversampling: it becomes the attacker's strategy space.
