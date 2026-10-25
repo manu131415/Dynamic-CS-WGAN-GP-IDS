@@ -34,7 +34,10 @@ ap.add_argument("--fpr-target", type=float, default=0.15, help="only for --targe
 ap.add_argument("--eta", type=float, default=0.35)
 ap.add_argument("--patience", type=int, default=3)
 ap.add_argument("--fpr-cap", type=float, default=0.10)
+ap.add_argument("--baseline-cw", default="balanced", choices=["balanced", "none"],
+                help="class_weight of the retrained baseline A (RF/LR). Your saved baselines use balanced.")
 args = ap.parse_args()
+BASE_CW = None if args.baseline_cw == "none" else "balanced"
 tag = args.tuning_source
 
 OUT = Path(__file__).resolve().parent
@@ -45,9 +48,9 @@ hist_rows, final_rows = [], []
 
 for name in args.classifiers:
     print(f"\n===== {name} | tuning={tag} | seed={args.seed} | targets={args.target_mode} =====")
-    A = fit_model(ctx, name, args.seed, rf_trees=args.rf_trees)
+    A = fit_model(ctx, name, args.seed, rf_trees=args.rf_trees, baseline_cw=BASE_CW)
     pA_t, pA_f = A.predict_proba(ctx.X_t)[:, 1], A.predict_proba(ctx.X_f)[:, 1]
-    print(f"  baseline (unweighted): tuning ranking score = {mean_recall_at_fpr(ctx.y_t, pA_t):.4f}")
+    print(f"  baseline (class_weight={args.baseline_cw}): tuning ranking score = {mean_recall_at_fpr(ctx.y_t, pA_t):.4f}")
 
     res = run_feedback_loop(ctx, name, args.seed, rounds=args.rounds, eta=args.eta,
                             target_mode=args.target_mode, fn_target=args.fn_target,
@@ -56,7 +59,7 @@ for name in args.classifiers:
     hist_rows += res["history"]
     r0, best = res["round0"], res["best"]
 
-    for cfg, p_t, p_f in [("A. Baseline (retrained, unweighted)", pA_t, pA_f),
+    for cfg, p_t, p_f in [(f"A. Baseline (retrained, class_weight={args.baseline_cw})", pA_t, pA_f),
                           ("C. Dynamic (round 0)", r0["p_t"], r0["model"].predict_proba(ctx.X_f)[:, 1]),
                           (f"D. Feedback (best round {best['round']})", best["p_t"],
                            best["model"].predict_proba(ctx.X_f)[:, 1])]:
