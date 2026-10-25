@@ -44,19 +44,23 @@ def make_context(tuning_source):
 
 
 # ---------------- models ----------------
-def build_model(name, seed, rf_trees=100):
+def build_model(name, seed, rf_trees=100, class_weight=None):
+    """class_weight is only used for the BASELINE (your saved RF/LR baselines use 'balanced';
+    the cost-sensitive models use cost weights only). MLPClassifier has no class_weight."""
     if name == "random_forest":
-        return RandomForestClassifier(n_estimators=rf_trees, random_state=seed, n_jobs=-1)
+        return RandomForestClassifier(n_estimators=rf_trees, random_state=seed, n_jobs=-1,
+                                      class_weight=class_weight)
     if name == "logistic_regression":
-        return LogisticRegression(max_iter=1000, random_state=seed)
+        return LogisticRegression(max_iter=1000, random_state=seed, class_weight=class_weight)
     return MLPClassifier(hidden_layer_sizes=(128, 64), activation="relu", solver="adam",
                          batch_size=256, learning_rate_init=0.001, max_iter=30,
                          early_stopping=True, validation_fraction=0.1, random_state=seed)
 
 
-def fit_model(ctx, name, seed, w=None, rng=None, rf_trees=100):
-    """w=None -> unweighted baseline. MLP has no reliable sample_weight -> weighted resampling."""
-    m = build_model(name, seed, rf_trees)
+def fit_model(ctx, name, seed, w=None, rng=None, rf_trees=100, baseline_cw=None):
+    """w=None -> baseline (optionally class_weight=baseline_cw). MLP has no reliable
+    sample_weight -> weighted resampling."""
+    m = build_model(name, seed, rf_trees, class_weight=baseline_cw if w is None else None)
     if w is None:
         m.fit(ctx.X_tr, ctx.y_tr)
     elif name == "mlp":
