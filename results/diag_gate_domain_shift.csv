@@ -1,4 +1,4 @@
 group,n_train_used,n_test_used,domain_AUC,top_shift_features
 Normal,20000,20000,0.9037296805555557,"num__sinpkt(0.07), num__ct_dst_src_ltm(0.06), num__ackdat(0.05), num__dinpkt(0.05), num__dload(0.05), num__dur(0.05), num__sload(0.05), num__rate(0.04)"
-Fuzzers,14510,6062,0.9526643173677749,"num__ct_dst_src_ltm(0.21), num__ct_srv_dst(0.08), num__ct_srv_src(0.07), num__sload(0.04), num__dur(0.04), num__rate(0.04), num__sinpkt(0.04), num__sbytes(0.04)"
+Fuzzers,14510,6062,0.9526638121965263,"num__ct_dst_src_ltm(0.21), num__ct_srv_dst(0.08), num__ct_srv_src(0.07), num__sload(0.04), num__dur(0.04), num__rate(0.04), num__sinpkt(0.04), num__sbytes(0.04)"
 Shellcode,908,378,0.5602936886122727,"num__sload(0.12), num__smean(0.11), num__sbytes(0.10), num__rate(0.07), num__sinpkt(0.07), num__dur(0.07), num__ct_srv_src(0.06), num__ct_src_ltm(0.04)"
